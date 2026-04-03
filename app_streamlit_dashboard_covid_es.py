@@ -302,7 +302,15 @@ def normalizar_texto(valor: str) -> str:
 
 
 def carregar_dados(fonte):
-    df_bruto = pd.read_csv(fonte, sep=";", encoding="latin-1", low_memory=False)
+    try:
+        df_bruto = pd.read_csv(fonte, sep=";", encoding="utf-8-sig", low_memory=False)
+    except UnicodeDecodeError:
+        df_bruto = pd.read_csv(fonte, sep=";", encoding="latin-1", low_memory=False)
+
+    df_bruto.columns = [
+        str(coluna).replace("\ufeff", "").replace("ï»¿", "").strip()
+        for coluna in df_bruto.columns
+    ]
 
     for coluna in COLUNAS_DATA:
         if coluna in df_bruto.columns:
