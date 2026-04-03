@@ -1,0 +1,5 @@
+MICRODADOS.csv
+__pycache__/
+.streamlit/
+.ipynb_checkpoints/
+*.pyc
