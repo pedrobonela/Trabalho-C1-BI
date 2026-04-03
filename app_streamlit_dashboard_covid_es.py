@@ -1,10 +1,11 @@
 from pathlib import Path
+import re
 import tempfile
 import unicodedata
 
-import gdown
 import matplotlib.pyplot as plt
 import pandas as pd
+import requests
 import streamlit as st
 
 
@@ -16,7 +17,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 CSV_PADRAO = BASE_DIR / "MICRODADOS.csv"
-CSV_URL = "https://drive.google.com/file/d/1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx/view?usp=sharing"
+CSV_DRIVE_ID = "1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx"
 COLUNAS_DATA = [
     "DataNotificacao",
     "DataCadastro",
@@ -324,9 +325,40 @@ def carregar_dados(fonte):
 
 
 @st.cache_data(show_spinner=False)
-def baixar_csv_drive(url: str) -> str:
+def baixar_csv_drive(file_id: str) -> str:
     destino = Path(tempfile.gettempdir()) / "microdados_covid_es.csv"
-    gdown.download(url=url, output=str(destino), quiet=False, fuzzy=True)
+    session = requests.Session()
+    base_url = "https://drive.google.com/uc?export=download"
+
+    resposta = session.get(base_url, params={"id": file_id}, stream=True, timeout=120)
+    resposta.raise_for_status()
+
+    confirmacao = None
+    for chave, valor in resposta.cookies.items():
+        if chave.startswith("download_warning"):
+            confirmacao = valor
+            break
+
+    if confirmacao is None:
+        texto = resposta.text[:200000]
+        match = re.search(r'confirm=([0-9A-Za-z_]+)', texto)
+        if match:
+            confirmacao = match.group(1)
+
+    if confirmacao:
+        resposta = session.get(
+            base_url,
+            params={"id": file_id, "confirm": confirmacao},
+            stream=True,
+            timeout=120,
+        )
+        resposta.raise_for_status()
+
+    with open(destino, "wb") as arquivo:
+        for bloco in resposta.iter_content(chunk_size=1024 * 1024):
+            if bloco:
+                arquivo.write(bloco)
+
     return str(destino)
 
 
@@ -423,7 +455,7 @@ fonte_dados = CSV_PADRAO
 
 if not CSV_PADRAO.exists():
     with st.spinner("Baixando base publica do Google Drive..."):
-        fonte_dados = baixar_csv_drive(CSV_URL)
+        fonte_dados = baixar_csv_drive(CSV_DRIVE_ID)
 
 df_bruto, df_base_es = carregar_dados(
     str(fonte_dados) if isinstance(fonte_dados, Path) else fonte_dados
