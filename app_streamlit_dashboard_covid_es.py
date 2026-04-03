@@ -306,7 +306,12 @@ def carregar_dados(fonte):
 
     for coluna in COLUNAS_DATA:
         if coluna in df_bruto.columns:
-            df_bruto[coluna] = pd.to_datetime(df_bruto[coluna], errors="coerce")
+            try:
+                df_bruto[coluna] = pd.to_datetime(
+                    df_bruto[coluna], errors="coerce", format="mixed"
+                )
+            except TypeError:
+                df_bruto[coluna] = pd.to_datetime(df_bruto[coluna], errors="coerce")
 
     df_base_es = df_bruto.copy()
     if "Municipio" in df_base_es.columns:
