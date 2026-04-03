@@ -1,10 +1,8 @@
 from pathlib import Path
-import tempfile
 import unicodedata
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import requests
 import streamlit as st
 
 
@@ -16,7 +14,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 CSV_PADRAO = BASE_DIR / "MICRODADOS.csv"
-CSV_DRIVE_ID = "1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx"
+CSV_REDUZIDO = BASE_DIR / "MICRODADOS_reduzido.csv"
 COLUNAS_DATA = [
     "DataNotificacao",
     "DataCadastro",
@@ -323,31 +321,6 @@ def carregar_dados(fonte):
     return df_bruto, df_base_es
 
 
-@st.cache_data(show_spinner=False)
-def baixar_csv_drive(file_id: str) -> str:
-    destino = Path(tempfile.gettempdir()) / "microdados_covid_es.csv"
-    url = (
-        "https://drive.usercontent.google.com/download"
-        f"?id={file_id}&export=download&confirm=t"
-    )
-
-    with requests.get(url, stream=True, timeout=180) as resposta:
-        resposta.raise_for_status()
-        with open(destino, "wb") as arquivo:
-            for bloco in resposta.iter_content(chunk_size=1024 * 1024):
-                if bloco:
-                    arquivo.write(bloco)
-
-    with open(destino, "r", encoding="latin-1", errors="ignore") as arquivo:
-        cabecalho = arquivo.readline().strip()
-
-    if "DataNotificacao" not in cabecalho or "Municipio" not in cabecalho:
-        raise ValueError(
-            "O arquivo baixado do Google Drive nao parece ser o CSV esperado."
-        )
-
-    return str(destino)
-
 def formatar_numero(valor: int) -> str:
     return f"{int(valor):,}".replace(",", ".")
 
@@ -440,8 +413,14 @@ def grafico_pizza(serie: pd.Series, titulo: str):
 fonte_dados = CSV_PADRAO
 
 if not CSV_PADRAO.exists():
-    with st.spinner("Baixando base publica do Google Drive..."):
-        fonte_dados = baixar_csv_drive(CSV_DRIVE_ID)
+    fonte_dados = CSV_REDUZIDO
+
+if not Path(fonte_dados).exists():
+    st.error(
+        "Nenhum arquivo de dados foi encontrado. O app precisa de `MICRODADOS.csv` "
+        "ou `MICRODADOS_reduzido.csv` na pasta do projeto."
+    )
+    st.stop()
 
 df_bruto, df_base_es = carregar_dados(
     str(fonte_dados) if isinstance(fonte_dados, Path) else fonte_dados
@@ -824,15 +803,16 @@ with tabs[3]:
 
 
 fonte_texto = (
-    str(CSV_PADRAO)
+    str(fonte_dados)
     if isinstance(fonte_dados, Path)
-    else "CSV publicado no Google Drive"
+    else "arquivo de dados local"
 )
 st.markdown(
     f"""
     <div class="footer-note">
         Fonte de dados: Painel COVID-19 ES - <a href="https://coronavirus.es.gov.br/painel-covid-19-es" target="_blank">coronavirus.es.gov.br/painel-covid-19-es</a><br>
         Arquivo utilizado no app: {fonte_texto}<br>
+        Observacao: a versao publicada usa uma amostra reduzida da base para viabilizar o deploy online.<br>
         Painel desenvolvido a partir do notebook <strong>Atividade_C1_PedroBonela.ipynb</strong>.
     </div>
     """,
