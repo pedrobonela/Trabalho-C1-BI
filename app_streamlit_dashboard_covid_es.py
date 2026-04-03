@@ -14,6 +14,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 CSV_PADRAO = BASE_DIR / "MICRODADOS.csv"
+CSV_URL = "https://drive.google.com/uc?export=download&id=1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx"
 COLUNAS_DATA = [
     "DataNotificacao",
     "DataCadastro",
@@ -410,18 +411,9 @@ def grafico_pizza(serie: pd.Series, titulo: str):
 
 
 fonte_dados = CSV_PADRAO
-arquivo_enviado = None
 
 if not CSV_PADRAO.exists():
-    st.warning("O arquivo `MICRODADOS.csv` nao foi encontrado na pasta do projeto.")
-    arquivo_enviado = st.file_uploader(
-        "Selecionar MICRODADOS.csv",
-        type=["csv"],
-        label_visibility="collapsed",
-    )
-    if arquivo_enviado is None:
-        st.stop()
-    fonte_dados = arquivo_enviado
+    fonte_dados = CSV_URL
 
 df_bruto, df_base_es = carregar_dados(
     str(fonte_dados) if isinstance(fonte_dados, Path) else fonte_dados
@@ -803,11 +795,12 @@ with tabs[3]:
     st.dataframe(nulos, use_container_width=True, hide_index=True)
 
 
-fonte_texto = str(CSV_PADRAO) if isinstance(fonte_dados, Path) else "arquivo enviado manualmente"
+fonte_texto = str(CSV_PADRAO) if isinstance(fonte_dados, Path) else "CSV publicado no Google Drive"
 st.markdown(
     f"""
     <div class="footer-note">
         Fonte de dados: Painel COVID-19 ES - <a href="https://coronavirus.es.gov.br/painel-covid-19-es" target="_blank">coronavirus.es.gov.br/painel-covid-19-es</a><br>
+        Arquivo utilizado no app: {fonte_texto}<br>
         Painel desenvolvido a partir do notebook <strong>Atividade_C1_PedroBonela.ipynb</strong>.
     </div>
     """,
