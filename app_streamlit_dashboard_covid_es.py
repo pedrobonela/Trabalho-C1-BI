@@ -1,6 +1,8 @@
 from pathlib import Path
+import tempfile
 import unicodedata
 
+import gdown
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
@@ -14,7 +16,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 CSV_PADRAO = BASE_DIR / "MICRODADOS.csv"
-CSV_URL = "https://drive.google.com/uc?export=download&id=1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx"
+CSV_URL = "https://drive.google.com/file/d/1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx/view?usp=sharing"
 COLUNAS_DATA = [
     "DataNotificacao",
     "DataCadastro",
@@ -321,6 +323,13 @@ def carregar_dados(fonte):
     return df_bruto, df_base_es
 
 
+@st.cache_data(show_spinner=False)
+def baixar_csv_drive(url: str) -> str:
+    destino = Path(tempfile.gettempdir()) / "microdados_covid_es.csv"
+    gdown.download(url=url, output=str(destino), quiet=False, fuzzy=True)
+    return str(destino)
+
+
 def formatar_numero(valor: int) -> str:
     return f"{int(valor):,}".replace(",", ".")
 
@@ -413,7 +422,8 @@ def grafico_pizza(serie: pd.Series, titulo: str):
 fonte_dados = CSV_PADRAO
 
 if not CSV_PADRAO.exists():
-    fonte_dados = CSV_URL
+    with st.spinner("Baixando base publica do Google Drive..."):
+        fonte_dados = baixar_csv_drive(CSV_URL)
 
 df_bruto, df_base_es = carregar_dados(
     str(fonte_dados) if isinstance(fonte_dados, Path) else fonte_dados
