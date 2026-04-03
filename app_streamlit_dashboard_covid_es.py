@@ -1,8 +1,10 @@
 from pathlib import Path
+import tempfile
 import unicodedata
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import requests
 import streamlit as st
 
 
@@ -14,7 +16,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 CSV_PADRAO = BASE_DIR / "MICRODADOS.csv"
-CSV_URL = "https://bi.s3.es.gov.br/covid19/MICRODADOS.csv"
+CSV_DRIVE_ID = "1aa0kr8sBw1L5yc5bbfJq7k_Us9CSh_kx"
 COLUNAS_DATA = [
     "DataNotificacao",
     "DataCadastro",
@@ -320,6 +322,32 @@ def carregar_dados(fonte):
 
     return df_bruto, df_base_es
 
+
+@st.cache_data(show_spinner=False)
+def baixar_csv_drive(file_id: str) -> str:
+    destino = Path(tempfile.gettempdir()) / "microdados_covid_es.csv"
+    url = (
+        "https://drive.usercontent.google.com/download"
+        f"?id={file_id}&export=download&confirm=t"
+    )
+
+    with requests.get(url, stream=True, timeout=180) as resposta:
+        resposta.raise_for_status()
+        with open(destino, "wb") as arquivo:
+            for bloco in resposta.iter_content(chunk_size=1024 * 1024):
+                if bloco:
+                    arquivo.write(bloco)
+
+    with open(destino, "r", encoding="latin-1", errors="ignore") as arquivo:
+        cabecalho = arquivo.readline().strip()
+
+    if "DataNotificacao" not in cabecalho or "Municipio" not in cabecalho:
+        raise ValueError(
+            "O arquivo baixado do Google Drive nao parece ser o CSV esperado."
+        )
+
+    return str(destino)
+
 def formatar_numero(valor: int) -> str:
     return f"{int(valor):,}".replace(",", ".")
 
@@ -412,7 +440,8 @@ def grafico_pizza(serie: pd.Series, titulo: str):
 fonte_dados = CSV_PADRAO
 
 if not CSV_PADRAO.exists():
-    fonte_dados = CSV_URL
+    with st.spinner("Baixando base publica do Google Drive..."):
+        fonte_dados = baixar_csv_drive(CSV_DRIVE_ID)
 
 df_bruto, df_base_es = carregar_dados(
     str(fonte_dados) if isinstance(fonte_dados, Path) else fonte_dados
@@ -794,7 +823,11 @@ with tabs[3]:
     st.dataframe(nulos, use_container_width=True, hide_index=True)
 
 
-fonte_texto = str(CSV_PADRAO) if isinstance(fonte_dados, Path) else CSV_URL
+fonte_texto = (
+    str(CSV_PADRAO)
+    if isinstance(fonte_dados, Path)
+    else "CSV publicado no Google Drive"
+)
 st.markdown(
     f"""
     <div class="footer-note">
